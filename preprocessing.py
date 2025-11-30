@@ -3,6 +3,7 @@ import json, networkx as nx
 import re
 from pathlib import Path
 from tqdm import tqdm
+import pickle
 
 def extract_premises(a):
     """ extract premises from an annotated tactic string """
@@ -24,46 +25,34 @@ def safe_str(x):
     return str(x).replace("\n", " ").strip()
 
 def build_ptg(theorem):
-    """ build a proof term graph (PTG) for a given theorem """
     G = nx.DiGraph()
-    print(theorem.get("full_name", "unknown theorem"))
     tactics = theorem.get("traced_tactics") or []
 
+    last_tactic = None
+
     for t in tactics:
-        print("==========Traced Tactics==========")
-        print(t)
-        print("==========Traced Tactics Done==========")
         s_before = safe_str(t.get("state_before"))
         s_after  = safe_str(t.get("state_after"))
         tactic_str = safe_str(t.get("tactic"))
-        
-        print("==========States==========")
-        print(f"Processing tactic: {tactic_str}")
-        print(f"State before: {s_before}")
-        print(f"State after: {s_after}")    
-        print("==========States Done==========")
 
         if not tactic_str:
             continue
-        
-        # add nodes
+
+        last_tactic = tactic_str   # store latest
+
         G.add_node(s_before, type="state")
         G.add_node(s_after, type="state")
         G.add_node(tactic_str, type="tactic")
-        
-        # add edges (state_before -> tactic -> state_after)
+
         G.add_edge(s_before, tactic_str, relation="applies")
         G.add_edge(tactic_str, s_after, relation="yields")
 
-        # add premises used in the tactic
         for p in extract_premises(t.get("annotated_tactic")):
-            print("==========Premises==========")
-            print(f"  Found premise: {p}")
             G.add_node(p, type="premise")
             G.add_edge(p, tactic_str, relation="used_in")
-            print("==========Premises Done==========")
-    
-    return G
+
+    return G, last_tactic
+
 
 def sanitize_name(name):
     if not name:
@@ -73,11 +62,11 @@ def sanitize_name(name):
 def preprocess_dataset():
     """ preprocess the dataset and save PTGs """
     for split in ["train", "val", "test"]:
-        json_path = Path(f"data/test_parsing.json")
+        json_path = Path(f"data/raw/{split}.json")
         if not json_path.exists():
             continue
 
-        out_split = Path(f"data")
+        out_split = Path(f"data/processed/{split}")
         out_split.mkdir(parents=True, exist_ok=True)
 
         with open(json_path, "r") as f:
@@ -88,11 +77,14 @@ def preprocess_dataset():
             if not th.get("traced_tactics"):
                 continue
             try:
-                G = build_ptg(th)
+                G, target = build_ptg(th)
+                if target is None:     # skip theorems with no tactics
+                    continue
                 if len(G) == 0:
                     continue
                 name = sanitize_name(th.get("full_name", "unknown"))
-                import pickle
+                G.graph["target_tactic"] = target  # store target tactic in metadata
+
                 with open(out_split / f"{name}.gpickle", "wb") as f:
                     pickle.dump(G, f)
                 ok += 1

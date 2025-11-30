@@ -1,1 +1,7 @@
 .DS_Store
+data/raw/
+data/pyg/
+data/processed/
+__pycache__/
+lm_bank.pt
+lm_strings.json
