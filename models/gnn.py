@@ -26,7 +26,7 @@ class ProofGNN_NextNode(nn.Module):
 
 class ProofGNN_NextTactic(nn.Module):
     """
-    Clean tactic-only GNN:
+    tactic-only GNN:
       - node_type ∈ {0,1,2}
       - node_tactic_id ∈ {-1, 0..num_tactics-1}
       - predict graph.target_tactic ∈ [0..num_tactics-1]
@@ -39,64 +39,67 @@ class ProofGNN_NextTactic(nn.Module):
         type_embed_dim=32,
         tactic_embed_dim=64,
         hidden_dim=512,
-        dropout=0.2
+        dropout=0.2,
     ):
         super().__init__()
 
         self.num_tactics = num_tactics
 
-        # Node type embedding (state/tactic/premise)
-        self.type_emb = nn.Embedding(
-            num_node_types, 
-            type_embed_dim
-        )
+        # node type embedding
+        self.type_emb = nn.Embedding(num_node_types, type_embed_dim)
 
-        # Tactic embedding:
-        #   node_tactic_id = -1 for non tactic nodes
-        #   shift by +1 to map:
-        #       -1 → 0
-        #       0 → 1
-        #       ...
-        #       num_tactics-1 → num_tactics
-        self.tactic_emb = nn.Embedding(
-            num_tactics + 1, # extra slot for "no tactic"
-            tactic_embed_dim
-        )
+        # tactic embedding
+        #
+        # node_tactic_id = -1 for non-tactic nodes
+        # We shift index by +1 so:
+        #   -1 -> 0   (dummy index)
+        #    0 -> 1
+        #    ...
+        # num_tactics-1 -> num_tactics
+        self.tactic_emb = nn.Embedding(num_tactics + 1, tactic_embed_dim)
 
-
-
+        # GNN layers
         input_dim = type_embed_dim + tactic_embed_dim
         self.conv1 = SAGEConv(input_dim, hidden_dim)
         self.conv2 = SAGEConv(hidden_dim, hidden_dim)
+
         self.dropout = nn.Dropout(p=dropout)
 
+        # classifier
         self.classifier = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(p=dropout),
             nn.Linear(hidden_dim, num_tactics),
         )
+    # fwd
+    def forward(self, data, remove_tactic_feature=False, remove_node_type=False):
 
-    def forward(self, data):
-        node_type = data.node_type
-        node_tactic_id = data.node_tactic_id
+        node_type = data.node_type 
+        node_tactic_id = data.node_tactic_id 
 
-        # type embedding
+        # ablation
+        if remove_node_type:
+            node_type = torch.zeros_like(node_type)
+
         t_type = self.type_emb(node_type)
-
-        # tactic embedding with shift
         shifted = torch.clamp(node_tactic_id + 1, min=0, max=self.num_tactics)
-        t_tactic = self.tactic_emb(shifted)
+
+        if remove_tactic_feature:
+            t_tactic = torch.zeros_like(self.tactic_emb(shifted))
+        else:
+            t_tactic = self.tactic_emb(shifted)
+
+
 
         x = torch.cat([t_type, t_tactic], dim=-1)
 
         x = self.conv1(x, data.edge_index).relu()
         x = self.dropout(x)
-        x = self.conv2(x, data.edge_index)
+
+        x = self.conv2(x, data.edge_index).relu()
         x = self.dropout(x)
 
-        graph_repr = global_mean_pool(x, data.batch)
-
-        # predict next tactic
+        graph_repr = global_mean_pool(x, data.batch) 
         logits = self.classifier(graph_repr)
         return logits
