@@ -49,7 +49,7 @@ class ProofGNN_NextTactic(nn.Module):
         self.type_emb = nn.Embedding(num_node_types, type_embed_dim)
 
         # tactic embedding
-        #
+        
         # node_tactic_id = -1 for non-tactic nodes
         # We shift index by +1 so:
         #   -1 -> 0   (dummy index)

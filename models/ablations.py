@@ -12,7 +12,7 @@ import argparse
 
 
 def run_experiment(config_overrides, name_suffix):
-    """run a training experiment with specific ablation settings."""
+    """run a training experiment with specific ablation settings"""
 
     base_config = {
         "batch_size":   8,
