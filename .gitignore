@@ -1,7 +1,7 @@
 .DS_Store
-data/raw/
-data/pyg/
-data/processed/
+data/
 __pycache__/
 lm_bank.pt
 lm_strings.json
+pytorch_scatter/
+runs/

@@ -24,20 +24,27 @@ def test(model_path, run_dir, batch_size=1):
         TACTICS = json.load(f)
 
     num_tactics = len(TACTICS)
-    num_node_types = 3  # (state, tactic, premise)
+    num_node_types = 3
 
     print(f"Loaded {num_tactics} tactics from {vocab_path}.")
+    
+    STATE_LM_BANK = torch.load("data/cache/state_lm_bank.pt")
+    state_lm_dim = STATE_LM_BANK.size(1)
 
     test_loader = load_test_data(batch_size=batch_size, path="data/pyg/test")
     print(f"Loaded {len(test_loader.dataset)} test graphs.")
 
     model = ProofGNN_NextTactic(
-        num_node_types=num_node_types,
-        num_tactics=num_tactics,
-        type_embed_dim=32,
-        tactic_embed_dim=64,
-        hidden_dim=512,
-    ).to(device)
+            num_node_types=3,
+            num_tactics=num_tactics,
+            state_lm_dim=state_lm_dim,
+            type_embed_dim=32,
+            tactic_embed_dim=64,
+            state_embed_dim=128,
+            hidden_dim=512,
+            dropout=0.2,
+            state_lm_bank=STATE_LM_BANK,
+        ).to(device)
 
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
@@ -52,7 +59,13 @@ def test(model_path, run_dir, batch_size=1):
         for batch in tqdm(test_loader, desc="Testing"):
             batch = batch.to(device)
 
-            logits = model(batch) 
+            logits = model(
+                        batch,
+                        remove_tactic_feature=False,
+                        remove_node_type=False,
+                        tactic_dropout_p=0.0, 
+                        training=False
+                    )
             preds = logits.argmax(dim=-1)
             targets = batch.target_tactic
 
@@ -61,6 +74,12 @@ def test(model_path, run_dir, batch_size=1):
 
             correct += (preds == targets).sum().item()
             total += targets.numel()
+            
+            
+            
+            
+            
+            
 
     accuracy = correct / total if total > 0 else 0.0
     print(f"\nTest Accuracy: {accuracy:.4f}")

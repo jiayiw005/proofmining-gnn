@@ -9,8 +9,6 @@ from datetime import datetime
 from data_loader import load_train_data, load_val_data
 from gnn import ProofGNN_NextTactic
 
-STATE_LM_BANK = torch.load("data/cache/state_lm_bank.pt")
-
 
 def make_run_dir(base="runs"):
     os.makedirs(base, exist_ok=True)
@@ -20,8 +18,7 @@ def make_run_dir(base="runs"):
     return run_dir
 
 def train_next_tactic(batch_size, epochs, lr, save_every_epoch=False, model_hparams={}, run_dir_override=None):
-    tactic_dropout_p = model_hparams.get("tactic_dropout_p", 0.0)
-
+    
     # MLP baseline helper
     def make_mlp(num_tactics):
         return nn.Sequential(
@@ -48,44 +45,33 @@ def train_next_tactic(batch_size, epochs, lr, save_every_epoch=False, model_hpar
     with open("data/cache/tactic_vocab.json") as f:
         TACTICS = json.load(f)
     num_tactics = len(TACTICS)
-    num_node_types = 3 
+    num_node_types = 3
 
     print(f"Loaded {num_tactics} tactics.")
 
     with open(os.path.join(run_dir, "tactic_vocab.json"), "w") as f:
         json.dump(TACTICS, f, indent=2)
 
-    STATE_LM_BANK = torch.load("data/cache/state_lm_bank.pt") 
-    state_lm_dim = STATE_LM_BANK.size(1)
-    print(f"Loaded state LM bank with dim = {state_lm_dim}.")
+    train_loader = load_train_data(batch_size=batch_size, path="data/pyg/train")
+    val_loader   = load_val_data(batch_size=batch_size, path="data/pyg/val")
 
-    # data
-    train_loader = load_train_data(batch_size=batch_size, path="data/pyg_semantic/train")
-    val_loader   = load_val_data(batch_size=batch_size, path="data/pyg_semantic/val")
-
-    # model
+    # models (by ablation)
     if mlp_bag:
-        # mlp baseline
         model = make_mlp(num_tactics).to(device)
         optimizer = AdamW(model.parameters(), lr=lr)
-        print("Running MLP baseline (no GNN, no semantics).")
+        print("Running MLP baseline (no GNN).")
     else:
         model = ProofGNN_NextTactic(
-            num_node_types=3,
+            num_node_types=num_node_types,
             num_tactics=num_tactics,
-            state_lm_dim=state_lm_dim,
             type_embed_dim=32,
             tactic_embed_dim=64,
-            state_embed_dim=128, 
             hidden_dim=512,
-            dropout=0.2,
-            state_lm_bank=STATE_LM_BANK,
         ).to(device)
         optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
         print(model)
 
     criterion = nn.CrossEntropyLoss()
-
 
     # logging
     log = {
@@ -153,11 +139,8 @@ def train_next_tactic(batch_size, epochs, lr, save_every_epoch=False, model_hpar
                 logits = model(
                     batch,
                     remove_tactic_feature=remove_tactic_feature,
-                    remove_node_type=remove_node_type,
-                    tactic_dropout_p=tactic_dropout_p,
-                    training=True
+                    remove_node_type=remove_node_type
                 )
-
 
             # loss
             targets = batch.target_tactic
@@ -218,11 +201,8 @@ def train_next_tactic(batch_size, epochs, lr, save_every_epoch=False, model_hpar
                     logits = model(
                         batch,
                         remove_tactic_feature=remove_tactic_feature,
-                        remove_node_type=remove_node_type,
-                        tactic_dropout_p=0.0, 
-                        training=False
+                        remove_node_type=remove_node_type
                     )
-
 
                 targets = batch.target_tactic
                 loss = criterion(logits, targets)
@@ -265,11 +245,8 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     train_next_tactic(
-        batch_size=8,
-        epochs=15,
-        lr=3e-4,
-        model_hparams={
-            "tactic_dropout_p": 0.5
-        }
+        batch_size=args.batch_size,
+        epochs=args.epochs,
+        lr=args.lr,
+        save_every_epoch=args.save_every_epoch,
     )
-

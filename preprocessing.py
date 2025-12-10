@@ -78,12 +78,12 @@ def preprocess_dataset():
                 continue
             try:
                 G, target = build_ptg(th)
-                if target is None:     # skip theorems with no tactics
+                if target is None: 
                     continue
                 if len(G) == 0:
                     continue
                 name = sanitize_name(th.get("full_name", "unknown"))
-                G.graph["target_tactic"] = target  # store target tactic in metadata
+                G.graph["target_tactic"] = target 
 
                 with open(out_split / f"{name}.gpickle", "wb") as f:
                     pickle.dump(G, f)
