@@ -1,4 +1,3 @@
-# test_next_tactic.py
 import json
 import torch
 from tqdm import tqdm
@@ -17,7 +16,7 @@ def test(model_path, run_dir, batch_size=1):
     if not os.path.exists(vocab_path):
         raise FileNotFoundError(
             f"Could not find {vocab_path}. "
-            "The test script must load the SAME vocab used in training."
+            "The test script must load the same vocab used in training."
         )
 
     with open(vocab_path) as f:
@@ -31,7 +30,7 @@ def test(model_path, run_dir, batch_size=1):
     STATE_LM_BANK = torch.load("data/cache/state_lm_bank.pt")
     state_lm_dim = STATE_LM_BANK.size(1)
 
-    test_loader = load_test_data(batch_size=batch_size, path="data/pyg/test")
+    test_loader = load_test_data(batch_size=batch_size, path="data/pyg_semantic/test")
     print(f"Loaded {len(test_loader.dataset)} test graphs.")
 
     model = ProofGNN_NextTactic(
@@ -60,12 +59,11 @@ def test(model_path, run_dir, batch_size=1):
             batch = batch.to(device)
 
             logits = model(
-                        batch,
-                        remove_tactic_feature=False,
-                        remove_node_type=False,
-                        tactic_dropout_p=0.0, 
-                        training=False
-                    )
+                batch,
+                remove_tactic_feature=False,
+                remove_node_type=False
+            )
+
             preds = logits.argmax(dim=-1)
             targets = batch.target_tactic
 
@@ -74,9 +72,6 @@ def test(model_path, run_dir, batch_size=1):
 
             correct += (preds == targets).sum().item()
             total += targets.numel()
-            
-            
-            
             
             
             

@@ -31,7 +31,6 @@ def main(
     torch.save(labels_t, out_path)
 
     print(f"Saved cluster assignments to: {out_path}")
-    print(f"Num clusters used: {labels_t.max().item() + 1}")
 
 
 if __name__ == "__main__":
