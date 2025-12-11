@@ -1,4 +1,4 @@
-# **ProofMining-GNN: Capturing Graph Structures in Lean4 Theorem Proving**
+# **Probing Structural Signals in Lean4 Proof Graphs with GNNs**
 
 This repository contains the full code for training, evaluating, and running ablation studies on a Graph Neural Network (GNN) model for *next-tactic prediction* in Lean4 theorem proving.
 The model operates over proof-state graphs extracted from [LeanDojo](https://zenodo.org/records/12740403) and uses both symbolic features (node types, tactic IDs) and optional semantic features (sentence-embedding representations of proof states).
